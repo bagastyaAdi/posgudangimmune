@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { TrendingUp, Users, Coffee, Store } from 'lucide-react';
+import { TrendingUp, Users, Coffee, Store, RefreshCw } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,15 +45,21 @@ export default function AdminDashboard() {
         cups: productCount || 0
       }));
 
-      // 4. Get total revenue (all time)
-      const { data: allTx } = await supabase.from('transactions').select('total_amount');
-      let allTimeRevenue = 0;
-      if (allTx) {
-        allTimeRevenue = allTx.reduce((sum, tx) => sum + (Number(tx.total_amount) || 0), 0);
+      // 4. Get today's total revenue
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const { data: todayTx } = await supabase
+        .from('transactions')
+        .select('total_amount')
+        .gte('created_at', today.toISOString());
+        
+      let todayRevenue = 0;
+      if (todayTx) {
+        todayRevenue = todayTx.reduce((sum, tx) => sum + (Number(tx.total_amount) || 0), 0);
       }
 
       setStatsData({
-        revenue: allTimeRevenue,
+        revenue: todayRevenue,
         branches: branchesCount || 0,
         staff: staffCount || 0,
         cups: productCount || 0
@@ -87,7 +93,7 @@ export default function AdminDashboard() {
   };
 
   const stats = [
-    { label: 'Total Revenue (All Time)', value: `Rp ${statsData.revenue.toLocaleString('id-ID')}`, icon: <TrendingUp size={24} />, color: 'var(--primary)' },
+    { label: 'Pendapatan Hari Ini', value: `Rp ${statsData.revenue.toLocaleString('id-ID')}`, icon: <TrendingUp size={24} />, color: 'var(--primary)' },
     ...(isMultiBranch ? [{ label: 'Total Branches', value: `${statsData.branches}`, icon: <Store size={24} />, color: 'var(--success)' }] : []),
     { label: 'Total Staff', value: `${statsData.staff}`, icon: <Users size={24} />, color: '#3b82f6' },
     { label: 'Menu Items', value: `${statsData.cups}`, icon: <Coffee size={24} />, color: '#a855f7' },
@@ -100,6 +106,15 @@ export default function AdminDashboard() {
           <h1 className="text-primary mb-1">Dashboard Overview</h1>
           <p className="text-muted">Welcome back, Admin. Here is today's summary.</p>
         </div>
+        <button 
+          onClick={fetchDashboardData} 
+          disabled={loading} 
+          className="btn-secondary" 
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}
+        >
+           <RefreshCw size={16} />
+           {loading ? 'Menyegarkan...' : 'Refresh Data'}
+        </button>
       </div>
 
       {/* Stats Grid */}

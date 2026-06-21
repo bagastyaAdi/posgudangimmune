@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, QrCode, Search, X } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { supabase } from '../supabase';
 import { useSettings } from '../contexts/SettingsContext';
 
@@ -19,6 +20,8 @@ export default function POS() {
 
   // Cart state
   const [cart, setCart] = useState([]);
+  const [lastTransaction, setLastTransaction] = useState(null);
+  const [customerWA, setCustomerWA] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Tunai');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -277,7 +280,14 @@ export default function POS() {
       }
 
       // Success
-      alert('Pembayaran berhasil!');
+      setLastTransaction({
+        items: [...cart],
+        total: cartTotal,
+        paymentMethod: paymentMethod,
+        date: new Date().toISOString(),
+        cashier: userData?.name || 'Unknown',
+        branch: selectedBranch
+      });
       setCart([]);
       fetchInventory(selectedBranch); // refresh inventory
       fetchDailyTransactions(selectedBranch); // refresh transactions
@@ -287,6 +297,43 @@ export default function POS() {
       alert('Terjadi kesalahan saat menyimpan transaksi:\n' + err.message);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handlePrintReceipt = () => {
+    window.print();
+  };
+
+  const handleCopyReceiptWA = async () => {
+    const el = document.getElementById('receipt-print-area');
+    if (!el) return;
+    try {
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff' });
+      canvas.toBlob(async (blob) => {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ]);
+          
+          let waUrl = 'https://wa.me/?text=Halo,+berikut+adalah+nota+pembelian+Anda.+Silakan+Paste+(Tempel)+gambar+struk+disini%3A';
+          if (customerWA && customerWA.trim() !== '') {
+            let phone = customerWA.trim().replace(/\D/g, '');
+            if (phone.startsWith('0')) {
+              phone = '62' + phone.substring(1);
+            }
+            waUrl = `https://wa.me/${phone}?text=Halo,+berikut+adalah+nota+pembelian+Anda.+Silakan+Paste+(Tempel)+gambar+struk+disini%3A`;
+          }
+          
+          alert('Gambar Struk berhasil disalin!\nSilakan Paste/Tempel di chat WhatsApp Anda.');
+          window.open(waUrl, '_blank');
+        } catch (err) {
+          alert('Gagal menyalin gambar ke clipboard. Browser Anda mungkin tidak mendukung fitur ini.');
+          console.error(err);
+        }
+      }, 'image/png');
+    } catch (err) {
+      console.error('Failed to generate receipt image', err);
+      alert('Gagal membuat gambar struk.');
     }
   };
 
@@ -308,7 +355,7 @@ export default function POS() {
   });
 
   return (
-    <div className="animate-fade-in" style={{ paddingBottom: '2rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="animate-fade-in" style={{ paddingBottom: '0', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
 
       {/* Header */}
       <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -364,14 +411,42 @@ export default function POS() {
           </div>
         </div>
       ) : (
-        <div className="pos-grid">
+        <div className="pos-grid" style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
         
         {/* LEFT: Product Catalog */}
-        <div className="glass-panel mobile-glass-compact" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+        <div className="glass-panel mobile-glass-compact" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', minHeight: 0 }}>
           
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: '1.5rem', flexShrink: 0 }}>
             <h2 className="mobile-hide" style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '0.75rem' }}>Katalog Produk</h2>
             
+            {/* Mobile Auto Scroll Cart Button */}
+            <button 
+              className="btn-primary mobile-only-btn" 
+              onClick={() => setIsCartOpen(true)}
+              style={{ 
+                width: '100%', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                padding: '0.8rem 1.25rem', 
+                marginBottom: '1rem', 
+                borderRadius: '12px',
+                boxShadow: '0 4px 6px rgba(9, 108, 70, 0.2)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ShoppingCart size={20} />
+                <span style={{ fontWeight: 700, fontSize: '1rem' }}>Cek Transaksi / Keranjang</span>
+              </div>
+              {cart.length > 0 && (
+                <div style={{ backgroundColor: 'white', color: 'var(--primary)', padding: '0.2rem 0.6rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 800 }}>
+                  {cart.length} Item
+                </div>
+              )}
+            </button>
+
+            {/* Riwayat Transaksi Terakhir (Moved to Main Content) */}
+
+
             <div style={{ position: 'relative', width: '100%', marginBottom: '1rem' }}>
               <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input 
@@ -414,7 +489,7 @@ export default function POS() {
           ) : filteredProducts.length === 0 ? (
             <p className="text-muted text-center" style={{ padding: '2rem 0' }}>Tidak ada produk yang sesuai.</p>
           ) : (
-            <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>
+            <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem', flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.5rem' }}>
               {filteredProducts.map(prod => {
                 const stockKey = getStockKey(prod);
                 const currentStock = inventoryMap[stockKey] ?? inventoryMap[prod.name];
@@ -450,11 +525,33 @@ export default function POS() {
                         {cartItem.qty}
                       </div>
                     )}
-                    <div>
-                      <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem', lineHeight: '1.2' }}>{prod.name}</h4>
+                    <div style={{ width: '100%', overflow: 'hidden' }}>
+                      <h4 style={{ 
+                        fontSize: '0.9rem', 
+                        fontWeight: 700, 
+                        marginBottom: '0.35rem', 
+                        lineHeight: '1.2',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        color: 'var(--text-main)',
+                        width: '100%'
+                      }} title={prod.name}>
+                        {prod.name}
+                      </h4>
                       {prod.variant && prod.variant !== 'Standar' && (
-                        <span style={{ fontSize: '0.7rem', backgroundColor: 'rgba(0,0,0,0.05)', padding: '0.1rem 0.4rem', borderRadius: '4px', display: 'inline-block', marginBottom: '0.5rem' }}>
-                          {prod.variant}
+                        <span style={{ 
+                          fontSize: '0.75rem', 
+                          backgroundColor: 'rgba(16,185,129,0.1)', 
+                          color: 'var(--primary)',
+                          padding: '0.2rem 0.5rem', 
+                          borderRadius: '6px', 
+                          display: 'inline-block', 
+                          marginBottom: '0.5rem',
+                          fontWeight: 700,
+                          border: '1px solid rgba(16,185,129,0.2)'
+                        }}>
+                          Varian: {prod.variant}
                         </span>
                       )}
                     </div>
@@ -475,40 +572,15 @@ export default function POS() {
 
         {/* RIGHT: Cart & Checkout */}
         <>
-          {isCartOpen && <div className="sidebar-overlay mobile-only" onClick={() => setIsCartOpen(false)} style={{ zIndex: 1999 }}></div>}
-          <div id="cart-section" className={`desktop-sticky-cart mobile-cart-drawer ${isCartOpen ? 'open' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div id="cart-section" className={`desktop-sticky-cart mobile-cart-drawer ${isCartOpen ? 'open' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
             <div className="mobile-only mobile-cart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', fontWeight: 800 }}>Keranjang Belanja</h3>
-              <button onClick={() => setIsCartOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}>
+              <button onClick={() => setIsCartOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)' }}>
                 <X size={24} />
               </button>
             </div>
-          
-          {/* Riwayat Transaksi Terakhir */}
-          {dailyTransactions.length > 0 && (
-            <div className="glass-panel animate-fade-in" style={{ padding: '1.25rem' }}>
-              <h3 style={{ fontSize: '1rem', color: 'var(--primary)', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                Transaksi Terakhir
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {dailyTransactions.slice(0, 5).map(tx => (
-                  <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                    <div>
-                      <p style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '0.2rem' }}>Rp {Number(tx.total_amount).toLocaleString('id-ID')}</p>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} • {tx.details.length} item
-                      </p>
-                    </div>
-                    <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '12px', backgroundColor: tx.payment_method === 'Tunai' ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)', color: tx.payment_method === 'Tunai' ? 'var(--primary)' : '#3b82f6', fontWeight: 600 }}>
-                      {tx.payment_method}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', minHeight: '60vh' }}>
+          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', minHeight: '40vh' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
               <h2 style={{ fontSize: '1.1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <ShoppingCart size={20} /> Keranjang
@@ -598,6 +670,129 @@ export default function POS() {
             </div>
 
           </div>
+
+          {/* EMBEDDED RECEIPT SECTION */}
+          {lastTransaction && (
+            <div className="glass-panel animate-fade-in" style={{ padding: '1.5rem', marginTop: '1rem', backgroundColor: '#f8fafc', border: '2px solid var(--primary)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2 style={{ color: 'var(--primary)', margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>Nota Transaksi</h2>
+                <button onClick={() => {
+                  setLastTransaction(null);
+                  setCustomerWA('');
+                }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  <X size={20} />
+                </button>
+              </div>
+              
+              {/* The Actual Receipt */}
+              <div id="receipt-print-area" style={{ 
+                  backgroundColor: 'white', 
+                  color: 'black', 
+                  fontFamily: 'monospace', 
+                  fontSize: '12px', 
+                  padding: '15px', 
+                  width: '100%', 
+                  border: '1px dashed #cbd5e1',
+                  lineHeight: '1.4',
+                  borderRadius: '8px'
+                }}>
+                <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 'bold' }}>Nota Transaksi</div>
+                  <div style={{ fontSize: '10px' }}>
+                    Cabang: {lastTransaction.branch}
+                  </div>
+                </div>
+                <div style={{ borderBottom: '1px dashed black', margin: '10px 0' }}></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <span>Tanggal</span>
+                  <span>: {new Date(lastTransaction.date).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <span>Transaksi</span>
+                  <span>: {lastTransaction.paymentMethod.toUpperCase()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <span>Kasir</span>
+                  <span>: {lastTransaction.cashier}</span>
+                </div>
+                
+                <div style={{ borderBottom: '1px dashed black', margin: '10px 0' }}></div>
+                
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '5px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px dashed black' }}>
+                      <th style={{ paddingBottom: '5px', fontWeight: 'normal' }}>Produk</th>
+                      <th style={{ paddingBottom: '5px', textAlign: 'right', fontWeight: 'normal' }}>Harga</th>
+                      <th style={{ paddingBottom: '5px', textAlign: 'center', fontWeight: 'normal' }}>Qty</th>
+                      <th style={{ paddingBottom: '5px', textAlign: 'right', fontWeight: 'normal' }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lastTransaction.items.map((item, i) => (
+                      <React.Fragment key={i}>
+                        <tr>
+                          <td colSpan={4} style={{ paddingTop: '8px', fontWeight: 'bold' }}>
+                            {item.product.name} {item.product.variant && item.product.variant !== 'Standar' ? `(${item.product.variant})` : ''}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td></td>
+                          <td style={{ textAlign: 'right' }}>{(item.product.price).toLocaleString('id-ID')}</td>
+                          <td style={{ textAlign: 'center' }}>{item.qty}</td>
+                          <td style={{ textAlign: 'right' }}>{(item.product.price * item.qty).toLocaleString('id-ID')}</td>
+                        </tr>
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+                
+                <div style={{ borderBottom: '1px dashed black', margin: '10px 0' }}></div>
+                
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '20px', marginBottom: '2px' }}>
+                  <span style={{ width: '80px', textAlign: 'right' }}>Sub-total :</span>
+                  <span style={{ width: '80px', textAlign: 'right' }}>{(lastTransaction.total).toLocaleString('id-ID')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '20px', marginBottom: '2px' }}>
+                  <span style={{ width: '80px', textAlign: 'right' }}>Total :</span>
+                  <span style={{ width: '80px', textAlign: 'right' }}>{(lastTransaction.total).toLocaleString('id-ID')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '20px', marginBottom: '10px' }}>
+                  <span style={{ width: '80px', textAlign: 'right' }}>Bayar :</span>
+                  <span style={{ width: '80px', textAlign: 'right' }}>{(lastTransaction.total).toLocaleString('id-ID')}</span>
+                </div>
+                
+                <div style={{ fontWeight: 'bold', marginBottom: '15px' }}>
+                  Keterangan : Lunas
+                </div>
+                
+                <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '10px' }}>
+                  TERIMA KASIH<br/>
+                  Silahkan Berkunjung Kembali
+                </div>
+              </div>
+
+              <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.5rem' }}>
+                <div style={{ padding: '1rem', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem', display: 'block' }}>Kirim ke WhatsApp Pelanggan (Opsional)</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 08123456789"
+                    value={customerWA}
+                    onChange={(e) => setCustomerWA(e.target.value)}
+                    className="input-field"
+                    style={{ marginBottom: '0.75rem', padding: '0.6rem 1rem' }}
+                  />
+                  <button className="btn-secondary" onClick={handleCopyReceiptWA} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', backgroundColor: '#25D366', color: 'white', border: 'none', padding: '0.8rem' }}>
+                    📋 Copy Gambar & Buka WA
+                  </button>
+                </div>
+
+                <button className="btn-primary" onClick={handlePrintReceipt} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', padding: '0.9rem' }}>
+                  🖨️ Cetak Printer Thermal
+                </button>
+              </div>
+            </div>
+          )}
 
         </div>
         </>

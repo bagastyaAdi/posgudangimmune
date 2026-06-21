@@ -21,7 +21,7 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="flex" style={{ minHeight: '100vh', backgroundColor: 'var(--bg-dark)' }}>
+    <div className="flex" style={{ height: '100vh', backgroundColor: 'var(--bg-dark)', overflow: 'hidden' }}>
       {/* Mobile Top Header */}
       <div className="mobile-header items-center justify-between glass-panel" style={{ 
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 900, 
@@ -114,7 +114,7 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="main-content" style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+      <main className="main-content" style={{ flex: 1, padding: '2rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         <Outlet />
       </main>
     </div>

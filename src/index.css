@@ -28,15 +28,14 @@
 
 .pos-grid {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 1.5rem;
-  align-items: start;
+  align-items: stretch;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
   .pos-grid {
-    grid-template-columns: 1fr;
-    margin-top: 65px;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -52,7 +51,7 @@
   display: none;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
   .mobile-cart-fab {
     display: flex;
     position: fixed;
@@ -93,22 +92,24 @@
   
   .mobile-cart-drawer {
     position: fixed !important;
-    top: 0 !important;
-    right: -100vw !important;
+    top: auto !important;
+    bottom: -100vh !important;
+    left: 0 !important;
     width: 100vw !important;
     max-width: 100vw !important;
-    height: 100vh !important;
+    height: 90vh !important; /* Slightly shorter so user sees it's an overlay */
     background-color: var(--panel-bg) !important;
     z-index: 2000 !important;
-    transition: right 0.3s ease !important;
+    transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     overflow-y: auto !important;
     padding: 0 !important;
-    box-shadow: none !important;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.15) !important;
+    border-radius: 20px 20px 0 0 !important;
     margin-top: 0 !important;
     gap: 0 !important;
   }
   .mobile-cart-drawer.open {
-    right: 0 !important;
+    bottom: 0 !important;
   }
   
   .mobile-cart-drawer > .glass-panel {
@@ -308,13 +309,50 @@ button {
 }
 
 /* Responsive Grid/Flex Utilities */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .md-flex-col {
     flex-direction: column !important;
   }
   .md-items-start {
     align-items: flex-start !important;
   }
+  
+  /* Fix chart tooltip z-index */
+.recharts-tooltip-wrapper {
+  z-index: 1000 !important;
+}
+
+/* ==========================================================================
+   UNCONDITIONAL SIDEBAR (Drawer on all devices)
+   ========================================================================== */
+.admin-sidebar {
+  position: fixed !important;
+  height: 100vh !important;
+  left: -260px !important;
+  transition: left 0.3s ease !important;
+  z-index: 1000 !important;
+  box-shadow: 4px 0 15px rgba(0,0,0,0.1) !important;
+}
+
+.admin-sidebar.open {
+  left: 0 !important;
+}
+
+.sidebar-overlay {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+  background: rgba(0,0,0,0.5) !important;
+  z-index: 999 !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+.mobile-header {
+  display: flex !important;
+}
+
+.main-content {
+  padding-top: 5rem !important;
+}
   
   /* Make all inputs full width on mobile */
   .input-field {
@@ -441,6 +479,14 @@ button {
   .btn-primary, .btn-secondary { font-size: 0.88rem; padding: 0.65rem 0.9rem; }
 }
 
+.mobile-only-btn {
+  display: none;
+}
+@media (max-width: 768px) {
+  .mobile-only-btn {
+    display: flex;
+  }
+}
 
 /* Hide mobile header on desktop */
 .mobile-header {
@@ -481,4 +527,267 @@ button {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* ==========================================================================
+   PRINT STYLES (Thermal Receipt)
+   ========================================================================== */
+@media print {
+  /* Hide EVERYTHING by default */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Show ONLY the receipt container and its children */
+  #receipt-print-area, #receipt-print-area * {
+    visibility: visible;
+  }
+  
+  #receipt-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58mm; /* Standard thermal printer width */
+    margin: 0;
+    padding: 0;
+    border: none !important;
+  }
+
+  /* Ensure background and borders print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* ==========================================================================
+   UNCONDITIONAL SIDEBAR (Drawer on all devices)
+   ========================================================================== */
+.admin-sidebar {
+  position: fixed !important;
+  height: 100vh !important;
+  left: -260px !important;
+  transition: left 0.3s ease !important;
+  z-index: 1000 !important;
+  box-shadow: 4px 0 15px rgba(0,0,0,0.1) !important;
+}
+
+.admin-sidebar.open {
+  left: 0 !important;
+}
+
+.sidebar-overlay {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+  background: rgba(0,0,0,0.5) !important;
+  z-index: 999 !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+  
+  .mobile-header {
+    display: flex !important;
+  }
+  
+  .main-content {
+    padding: 1rem !important;
+    padding-top: 5rem !important; /* Make room for mobile header */
+    padding-bottom: 7rem !important; /* Make room for POS fixed bottom bar */
+  }
+
+  /* Modal improvements on mobile */
+  .modal-content {
+    padding: 1.25rem !important;
+    max-width: 100% !important;
+    margin: 0.5rem !important;
+    border-radius: 12px !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  /* Glass panels smaller padding on mobile */
+  .glass-panel {
+    border-radius: 12px !important;
+  }
+
+  /* TABLE: allow horizontal scroll on mobile */
+  .data-table th, .data-table td {
+    padding: 0.65rem 0.75rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* Branch h1 font size on mobile */
+  h1 { font-size: 1.3rem !important; }
+  h2 { font-size: 1.1rem !important; }
+  
+  /* POS Header area - stack vertically */
+  .pos-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+  
+  .pos-header > div:last-child {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+  
+  .pos-header select {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  /* POS Fixed bottom bar responsive */
+  .pos-submit-bar {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    padding: 0.75rem 1rem !important;
+  }
+  
+  .pos-submit-bar > div:first-child {
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    width: 100%;
+  }
+
+  .pos-submit-bar button {
+    width: 100% !important;
+    padding: 0.9rem !important;
+    font-size: 1rem !important;
+  }
+
+
+/* Very small phones */
+@media (max-width: 400px) {
+  .main-content {
+    padding: 0.75rem !important;
+    padding-top: 4.5rem !important;
+    padding-bottom: 7rem !important;
+  }
+  h1 { font-size: 1.15rem !important; }
+  .btn-primary, .btn-secondary { font-size: 0.88rem; padding: 0.65rem 0.9rem; }
+}
+
+.mobile-only-btn {
+  display: none;
+}
+@media (max-width: 768px) {
+  .mobile-only-btn {
+    display: flex;
+  }
+}
+
+/* Hide mobile header on desktop */
+.mobile-header {
+  display: none;
+}
+
+/* Table styling for nice contrast */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.data-table th, .data-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background-color: #f8fafc;
+}
+
+.data-table tr:hover td {
+  background-color: rgba(9, 108, 70, 0.02);
+}
+
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+
+/* Responsive Table Wrapper */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ==========================================================================
+   PRINT STYLES (Thermal Receipt)
+   ========================================================================== */
+@media print {
+  /* Hide EVERYTHING by default */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Show ONLY the receipt container and its children */
+  #receipt-print-area, #receipt-print-area * {
+    visibility: visible;
+  }
+  
+  #receipt-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58mm; /* Standard thermal printer width */
+    margin: 0;
+    padding: 0;
+    border: none !important;
+  }
+
+  /* Ensure background and borders print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* ==========================================================================
+   UNCONDITIONAL SIDEBAR (Drawer on all devices)
+   ========================================================================== */
+.admin-sidebar {
+  position: fixed !important;
+  height: 100vh !important;
+  left: -260px !important;
+  transition: left 0.3s ease !important;
+  z-index: 1000 !important;
+  box-shadow: 4px 0 15px rgba(0,0,0,0.1) !important;
+}
+
+.admin-sidebar.open {
+  left: 0 !important;
+}
+
+.sidebar-overlay {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+  background: rgba(0,0,0,0.5) !important;
+  z-index: 999 !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+.mobile-header {
+  display: flex !important;
+}
+
+.main-content {
+  padding-top: 5rem !important; /* Make room for mobile header */
+}
+
+/* ==========================================================================
+   MOBILE PRODUCT GRID (Force 2 columns on small screens)
+   ========================================================================== */
+@media (max-width: 640px) {
+  .mobile-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
 }
