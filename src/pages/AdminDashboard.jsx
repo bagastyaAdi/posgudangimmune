@@ -18,7 +18,7 @@ export default function AdminDashboard() {
     cups: 0
   });
   const [recentSales, setRecentSales] = useState([]);
-  const [dailyStatus, setDailyStatus] = useState([]);
+  const [recentTransactions, setRecentTransactions] = useState([]);
   const [todayRevenue, setTodayRevenue] = useState(0);
 
   useEffect(() => {
@@ -82,21 +82,17 @@ export default function AdminDashboard() {
           time: sale.created_at ? new Date(sale.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Ongoing'
         }));
         setRecentSales(formattedSales);
-
-        // Map branches to status
-        if (allBranches) {
-          const statusMap = allBranches.map(b => {
-            const bSales = salesData.filter(s => s.branch_name === b.name);
-            return {
-              name: b.name,
-              shift1: bSales.find(s => s.shift === '1'),
-              shift2: bSales.find(s => s.shift === '2'),
-              full: bSales.find(s => s.shift === '3')
-            };
-          });
-          setDailyStatus(statusMap);
-        }
       }
+
+      // 5. Get recent actual transactions (latest 5)
+      const { data: txData } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+        
+      if (txData) setRecentTransactions(txData);
+      
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
@@ -137,49 +133,30 @@ export default function AdminDashboard() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
         
-        {/* Daily Status Monitoring */}
+        {/* Recent Transactions */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            📅 Monitoring Laporan Harian
-            <span style={{ fontSize: '0.8rem', backgroundColor: 'var(--primary)', color: 'white', padding: '0.2rem 0.6rem', borderRadius: '12px' }}>Hari Ini</span>
+          <h2 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--primary)' }}>
+            Transaksi Terakhir
           </h2>
 
-          <div className="table-responsive">
-            <table className="data-table" style={{ marginTop: 0 }}>
-              <thead>
-                <tr>
-                  {isMultiBranch && <th>Cabang</th>}
-                  <th className="text-center">Shift 1</th>
-                  <th className="text-center">Shift 2</th>
-                  <th className="text-right">Total Hari Ini</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan="4" className="text-center py-4">Memuat status...</td></tr>
-                ) : dailyStatus.map(b => {
-                  const s1Status = b.full ? 'FULL' : b.shift1 ? (b.shift1.cash_akhir !== null ? 'CLOSED' : 'OPEN') : 'EMPTY';
-                  const s2Status = b.full ? 'FULL' : b.shift2 ? (b.shift2.cash_akhir !== null ? 'CLOSED' : 'OPEN') : 'EMPTY';
-                  const total = (b.shift1?.cash_akhir || 0) + (b.shift2?.cash_akhir || 0) + (b.full?.cash_akhir || 0);
-
-                  const getBadge = (status) => {
-                    if (status === 'CLOSED') return <span style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: 'var(--primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>CLOSED</span>;
-                    if (status === 'OPEN') return <span style={{ backgroundColor: 'rgba(251,191,36,0.15)', color: '#b45309', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>OPEN</span>;
-                    if (status === 'FULL') return <span style={{ backgroundColor: 'rgba(99,102,241,0.1)', color: '#4f46e5', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>FULL SHIFT</span>;
-                    return <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Belum Buka</span>;
-                  };
-
-                  return (
-                    <tr key={b.name}>
-                      {isMultiBranch && <td style={{ fontWeight: 600 }}>{b.name}</td>}
-                      <td className="text-center">{getBadge(s1Status)}</td>
-                      <td className="text-center">{getBadge(s2Status)}</td>
-                      <td className="text-right" style={{ fontWeight: 700 }}>Rp {total.toLocaleString('id-ID')}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+             {loading ? (
+               <p className="text-muted text-center py-4">Memuat transaksi...</p>
+             ) : recentTransactions.length === 0 ? (
+               <p className="text-muted text-center py-4">Belum ada transaksi.</p>
+             ) : recentTransactions.map(tx => (
+               <div key={tx.id} style={{ padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white' }}>
+                 <div>
+                   <p style={{ fontWeight: 600, fontSize: '1.1rem', marginBottom: '0.25rem' }}>Rp {Number(tx.total_amount).toLocaleString('id-ID')}</p>
+                   <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                     {new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB • {tx.details?.length || 0} item {isMultiBranch && `• ${tx.branch_name}`}
+                   </p>
+                 </div>
+                 <span style={{ fontSize: '0.85rem', padding: '0.3rem 0.8rem', borderRadius: '20px', backgroundColor: tx.payment_method === 'Tunai' ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)', color: tx.payment_method === 'Tunai' ? 'var(--primary)' : '#3b82f6', fontWeight: 600 }}>
+                   {tx.payment_method}
+                 </span>
+               </div>
+             ))}
           </div>
         </div>
 
