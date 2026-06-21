@@ -17,9 +17,8 @@ export default function AdminDashboard() {
     staff: 0,
     cups: 0
   });
-  const [recentSales, setRecentSales] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState([]);
-  const [todayRevenue, setTodayRevenue] = useState(0);
 
   useEffect(() => {
     fetchDashboardData();
@@ -32,8 +31,8 @@ export default function AdminDashboard() {
       // 1. Get total active branches
       const { count: branchesCount } = await supabase.from('outlets').select('*', { count: 'exact', head: true });
       
-      // 2. Get total branch staff
-      const { count: staffCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'branch');
+      // 2. Get total branch staff (anyone not admin/owner)
+      const { count: staffCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).neq('role', 'admin');
       
       // 3. Get total products (as a proxy for menu size or cups if we don't have detailed cup tracking yet)
       const { count: productCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
@@ -46,42 +45,29 @@ export default function AdminDashboard() {
         cups: productCount || 0
       }));
 
-      // 4. Get today's sales reports (using 'date' column which is more reliable)
-      const todayString = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
-
-      const { data: salesData, error: salesError } = await supabase.from('sales_reports')
-        .select('*')
-        .eq('date', todayString)
-        .order('id', { ascending: false });
-
-      if (salesError) {
-          console.warn("Sales reports query failed:", salesError);
+      // 4. Get total revenue (all time)
+      const { data: allTx } = await supabase.from('transactions').select('total_amount');
+      let allTimeRevenue = 0;
+      if (allTx) {
+        allTimeRevenue = allTx.reduce((sum, tx) => sum + (Number(tx.total_amount) || 0), 0);
       }
 
-      const { data: allBranches } = await supabase.from('outlets').select('name');
+      setStatsData({
+        revenue: allTimeRevenue,
+        branches: branchesCount || 0,
+        staff: staffCount || 0,
+        cups: productCount || 0
+      });
 
-      if (salesData) {
-        const total = salesData.reduce((sum, report) => sum + (report.cash_akhir || 0), 0);
-        setTodayRevenue(total);
-        
-        // Update the stats overview with fetched counts and revenue
-        setStatsData({
-          revenue: total, // Using today's total as summary for now
-          branches: branchesCount || 0,
-          staff: staffCount || 0,
-          cups: productCount || 0
-        });
-
-        const formattedSales = salesData.map(sale => ({
-          id: sale.id,
-          branch: sale.branch_name,
-          shift: sale.shift,
-          staff: sale.staff_name,
-          totalRp: sale.cash_akhir || 0,
-          status: sale.cash_akhir !== null ? 'CLOSED' : 'OPEN',
-          time: sale.created_at ? new Date(sale.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Ongoing'
-        }));
-        setRecentSales(formattedSales);
+      // 5. Get recent stock activities (restock and reductions/sales)
+      const { data: stockLogs } = await supabase
+        .from('stock_restock_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(6);
+      
+      if (stockLogs) {
+        setRecentActivities(stockLogs);
       }
 
       // 5. Get recent actual transactions (latest 5)
@@ -160,43 +146,44 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Recent Shift Reports */}
+        {/* Recent Activities (Stock/Sales Log) */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
           <h2 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between' }}>
             Aktivitas Terbaru
-            <Link to="/admin/riwayat-penjualan" style={{ fontSize: '0.85rem', fontWeight: 400, color: 'var(--primary)', cursor: 'pointer', textDecoration: 'none' }}>
-              Lihat Riwayat
+            <Link to="/admin/stok" style={{ fontSize: '0.85rem', fontWeight: 400, color: 'var(--primary)', cursor: 'pointer', textDecoration: 'none' }}>
+              Lihat Detail
             </Link>
           </h2>
           
-          <table className="data-table" style={{ marginTop: 0 }}>
-            <thead>
-              <tr>
-                <th>Waktu</th>
-                {isMultiBranch && <th>Cabang</th>}
-                <th>Shift</th>
-                <th className="text-right">Setor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan="4" className="text-center py-4">Memuat data...</td></tr>
-              ) : recentSales.length === 0 ? (
-                <tr><td colSpan="4" className="text-center py-4 text-muted">Belum ada aktivitas hari ini.</td></tr>
-              ) : recentSales.map(sale => (
-                <tr key={sale.id}>
-                  <td className="text-muted" style={{ fontSize: '0.8rem' }}>{sale.time}</td>
-                  {isMultiBranch && <td style={{ fontWeight: 500 }}>{sale.branch}</td>}
-                  <td>
-                    {sale.shift} {sale.status === 'OPEN' && <span style={{ marginLeft: '0.4rem', color: '#b45309', fontWeight: 800 }}>●</span>}
-                  </td>
-                  <td className="text-right" style={{ fontWeight: 600, color: sale.status === 'CLOSED' ? 'var(--success)' : 'var(--text-muted)' }}>
-                    {sale.status === 'CLOSED' ? `Rp ${sale.totalRp.toLocaleString('id-ID')}` : 'OPEN'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+             {loading ? (
+               <p className="text-center py-4 text-muted">Memuat aktivitas...</p>
+             ) : recentActivities.length === 0 ? (
+               <p className="text-center py-4 text-muted">Belum ada aktivitas.</p>
+             ) : recentActivities.map(log => {
+               const isAddition = log.qty_added > 0;
+               const badgeColor = isAddition ? 'var(--success)' : 'var(--danger)';
+               const badgeBg = isAddition ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+               const actionText = isAddition ? 'Restock Barang Masuk' : 'Pengurangan / Terjual';
+               
+               return (
+                 <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem', borderRadius: '8px', borderBottom: '1px dashed var(--border-color)' }}>
+                   <div>
+                     <p style={{ fontWeight: 700, fontSize: '0.95rem' }}>{log.product_name}</p>
+                     <p className="text-muted" style={{ fontSize: '0.8rem' }}>
+                       {new Date(log.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB {isMultiBranch && `• ${log.branch_name}`}
+                     </p>
+                   </div>
+                   <div style={{ textAlign: 'right' }}>
+                     <span style={{ backgroundColor: badgeBg, color: badgeColor, padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 800 }}>
+                       {isAddition ? '+' : ''}{log.qty_added} item
+                     </span>
+                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem', fontWeight: 600 }}>{actionText}</p>
+                   </div>
+                 </div>
+               );
+             })}
+          </div>
         </div>
       </div>
     </div>
