@@ -572,7 +572,7 @@ export default function POS() {
 
         {/* RIGHT: Cart & Checkout */}
         <>
-          <div id="cart-section" className={`desktop-sticky-cart mobile-cart-drawer ${isCartOpen ? 'open' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+          <div id="cart-section" className={`desktop-sticky-cart hide-scrollbar mobile-cart-drawer ${isCartOpen ? 'open' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="mobile-only mobile-cart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', fontWeight: 800 }}>Keranjang Belanja</h3>
               <button onClick={() => setIsCartOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)' }}>

@@ -24,6 +24,9 @@
 .desktop-sticky-cart {
   position: sticky;
   top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  align-self: start;
 }
 
 .pos-grid {
@@ -560,104 +563,6 @@ button {
   }
 }
 
-/* ==========================================================================
-   UNCONDITIONAL SIDEBAR (Drawer on all devices)
-   ========================================================================== */
-.admin-sidebar {
-  position: fixed !important;
-  height: 100vh !important;
-  left: -260px !important;
-  transition: left 0.3s ease !important;
-  z-index: 1000 !important;
-  box-shadow: 4px 0 15px rgba(0,0,0,0.1) !important;
-}
-
-.admin-sidebar.open {
-  left: 0 !important;
-}
-
-.sidebar-overlay {
-  position: fixed !important;
-  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-  background: rgba(0,0,0,0.5) !important;
-  z-index: 999 !important;
-  backdrop-filter: blur(2px) !important;
-}
-
-  
-  .mobile-header {
-    display: flex !important;
-  }
-  
-  .main-content {
-    padding: 1rem !important;
-    padding-top: 5rem !important; /* Make room for mobile header */
-    padding-bottom: 7rem !important; /* Make room for POS fixed bottom bar */
-  }
-
-  /* Modal improvements on mobile */
-  .modal-content {
-    padding: 1.25rem !important;
-    max-width: 100% !important;
-    margin: 0.5rem !important;
-    border-radius: 12px !important;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-  
-  /* Glass panels smaller padding on mobile */
-  .glass-panel {
-    border-radius: 12px !important;
-  }
-
-  /* TABLE: allow horizontal scroll on mobile */
-  .data-table th, .data-table td {
-    padding: 0.65rem 0.75rem !important;
-    font-size: 0.85rem !important;
-  }
-
-  /* Branch h1 font size on mobile */
-  h1 { font-size: 1.3rem !important; }
-  h2 { font-size: 1.1rem !important; }
-  
-  /* POS Header area - stack vertically */
-  .pos-header {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 0.75rem !important;
-  }
-  
-  .pos-header > div:last-child {
-    width: 100% !important;
-    flex-wrap: wrap !important;
-    gap: 0.5rem !important;
-  }
-  
-  .pos-header select {
-    flex: 1 !important;
-    min-width: 0 !important;
-  }
-
-  /* POS Fixed bottom bar responsive */
-  .pos-submit-bar {
-    flex-direction: column !important;
-    gap: 0.75rem !important;
-    padding: 0.75rem 1rem !important;
-  }
-  
-  .pos-submit-bar > div:first-child {
-    flex-wrap: wrap !important;
-    gap: 0.5rem !important;
-    width: 100%;
-  }
-
-  .pos-submit-bar button {
-    width: 100% !important;
-    padding: 0.9rem !important;
-    font-size: 1rem !important;
-  }
-
-
 /* Very small phones */
 @media (max-width: 400px) {
   .main-content {
@@ -748,38 +653,6 @@ button {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-}
-
-/* ==========================================================================
-   UNCONDITIONAL SIDEBAR (Drawer on all devices)
-   ========================================================================== */
-.admin-sidebar {
-  position: fixed !important;
-  height: 100vh !important;
-  left: -260px !important;
-  transition: left 0.3s ease !important;
-  z-index: 1000 !important;
-  box-shadow: 4px 0 15px rgba(0,0,0,0.1) !important;
-}
-
-.admin-sidebar.open {
-  left: 0 !important;
-}
-
-.sidebar-overlay {
-  position: fixed !important;
-  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-  background: rgba(0,0,0,0.5) !important;
-  z-index: 999 !important;
-  backdrop-filter: blur(2px) !important;
-}
-
-.mobile-header {
-  display: flex !important;
-}
-
-.main-content {
-  padding-top: 5rem !important; /* Make room for mobile header */
 }
 
 /* ==========================================================================
