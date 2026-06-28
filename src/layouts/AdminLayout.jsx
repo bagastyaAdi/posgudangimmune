@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { LogOut, LayoutDashboard, Store, Package, FileSpreadsheet, Users, PackageSearch, Menu, X, Warehouse, Wrench, ClipboardCheck, Settings, ShoppingCart } from 'lucide-react';
 
 export default function AdminLayout() {
   const { logout, userData } = useAuth();
+  const { isMultiBranch } = useSettings();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -21,9 +23,9 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="flex" style={{ height: '100vh', backgroundColor: 'var(--bg-dark)', overflow: 'hidden' }}>
+    <div className="flex admin-layout-root" style={{ height: '100vh', backgroundColor: 'var(--bg-dark)', overflow: 'hidden' }}>
       {/* Mobile Top Header */}
-      <div className="mobile-header items-center justify-between glass-panel" style={{ 
+      <div className="mobile-header items-center justify-between glass-panel no-print" style={{ 
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 900, 
         padding: '1rem', borderRadius: 0, borderBottom: '1px solid var(--border-color)' 
       }}>
@@ -37,14 +39,14 @@ export default function AdminLayout() {
       {isSidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
 
       {/* Sidebar */}
-      <aside className={`glass-panel admin-sidebar ${isSidebarOpen ? 'open' : ''}`} style={{ 
+      <aside className={`glass-panel admin-sidebar no-print ${isSidebarOpen ? 'open' : ''}`} style={{ 
         width: '260px', borderRadius: '0', display: 'flex', flexDirection: 'column', 
         borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--panel-bg)'
       }}>
         <div className="flex justify-between items-center" style={{ padding: '2rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>
           <div>
             <h2 style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '1.25rem', lineHeight: '1.2' }}>Gudang<br/>Immune Bali</h2>
-            <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>Admin Portal</p>
+            <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>POS</p>
           </div>
           <button className="mobile-header" onClick={closeSidebar} style={{ background: 'none', border: 'none', color: 'var(--text-main)' }}>
             <X size={20} />
@@ -94,9 +96,16 @@ export default function AdminLayout() {
             </>
           )}
           {userData?.role === 'admin' && (
-            <Link to="/admin/settings" onClick={closeSidebar} className="btn-secondary" style={{ justifyContent: 'flex-start', border: 'none' }}>
-              <Settings size={18} /> Pengaturan
-            </Link>
+            <>
+              {isMultiBranch && (
+                <Link to="/admin/outlets" onClick={closeSidebar} className="btn-secondary" style={{ justifyContent: 'flex-start', border: 'none' }}>
+                  <Store size={18} /> Kelola Cabang
+                </Link>
+              )}
+              <Link to="/admin/settings" onClick={closeSidebar} className="btn-secondary" style={{ justifyContent: 'flex-start', border: 'none' }}>
+                <Settings size={18} /> Pengaturan
+              </Link>
+            </>
           )}
         </nav>
 

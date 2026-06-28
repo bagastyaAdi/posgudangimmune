@@ -64,6 +64,7 @@ import RiwayatPenjualan from './pages/RiwayatPenjualan';
 import AdminInventory from './pages/AdminInventory';
 import AdminStockHistory from './pages/AdminStockHistory';
 import AdminSettings from './pages/AdminSettings';
+import AdminOutlets from './pages/AdminOutlets';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import RiwayatKasir from './pages/RiwayatKasir';
@@ -142,6 +143,7 @@ export default function App() {
             <Route path="inventory" element={<AdminInventory />} />
             <Route path="riwayat-stok" element={<AdminStockHistory />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="outlets" element={<AdminOutlets />} />
           </Route>
 
           {/* Fallback */}

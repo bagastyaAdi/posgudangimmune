@@ -1,6 +1,9 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { supabase } from '../supabase';
 
+// MASTER SWITCH: UBAH MENJADI `true` JIKA KLIEN SUDAH BAYAR LUNAS!
+export const IS_PREMIUM_UNLOCKED = false; 
+
 const SettingsContext = createContext();
 
 export function useSettings() {
@@ -8,50 +11,35 @@ export function useSettings() {
 }
 
 export function SettingsProvider({ children }) {
-  const [isMultiBranch, setIsMultiBranch] = useState(false);
-  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [isMultiBranch, setIsMultiBranch] = useState(() => {
+    return IS_PREMIUM_UNLOCKED && localStorage.getItem('is_multi_branch') === 'true';
+  });
+  const [isTutupKasirEnabled, setIsTutupKasirEnabled] = useState(() => {
+    return IS_PREMIUM_UNLOCKED && localStorage.getItem('is_tutup_kasir_enabled') !== 'false';
+  });
+  const [loadingSettings, setLoadingSettings] = useState(false);
 
+  // Tidak lagi menggunakan Supabase karena tabel app_settings tidak ditemukan
   useEffect(() => {
-    fetchSettings();
+    // Kosong, karena kita pakai localStorage langsung
   }, []);
 
-  const fetchSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('app_settings')
-        .select('is_multi_branch')
-        .eq('id', 1)
-        .single();
-        
-      if (!error && data) {
-        setIsMultiBranch(data.is_multi_branch);
-      }
-    } catch (err) {
-      console.error("Failed to load settings", err);
-    } finally {
-      setLoadingSettings(false);
-    }
+  const toggleMultiBranch = async (newValue) => {
+    localStorage.setItem('is_multi_branch', newValue ? 'true' : 'false');
+    setIsMultiBranch(newValue);
+    return true;
   };
 
-  const toggleMultiBranch = async (newValue) => {
-    try {
-      const { error } = await supabase
-        .from('app_settings')
-        .update({ is_multi_branch: newValue })
-        .eq('id', 1);
-        
-      if (error) throw error;
-      setIsMultiBranch(newValue);
-      return true;
-    } catch (err) {
-      console.error("Failed to update setting", err);
-      return false;
-    }
+  const toggleTutupKasir = (newValue) => {
+    localStorage.setItem('is_tutup_kasir_enabled', newValue);
+    setIsTutupKasirEnabled(newValue);
   };
 
   const value = {
     isMultiBranch,
     toggleMultiBranch,
+    isTutupKasirEnabled,
+    toggleTutupKasir,
     loadingSettings
   };
 

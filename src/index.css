@@ -33,7 +33,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
   gap: 1.5rem;
-  align-items: stretch;
+  align-items: flex-start;
 }
 
 @media (max-width: 768px) {
@@ -558,97 +558,185 @@ button {
 
   /* Ensure background and borders print */
   * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    padding: 0.85rem 1rem !important;
   }
-}
 
-/* Very small phones */
-@media (max-width: 400px) {
+  /* Adjust padding for buttons */
+  .btn-primary, .btn-secondary {
+    padding: 0.75rem 1.1rem;
+    font-size: 0.95rem;
+  }
+  
+  .hidden-mobile {
+    display: none !important;
+  }
+  
+  /* Sidebar Mobile Overlay */
+  .admin-sidebar {
+    position: fixed;
+    height: 100vh;
+    left: -260px;
+    transition: left 0.3s ease;
+    z-index: 1000;
+    box-shadow: 4px 0 15px rgba(0,0,0,0.1);
+  }
+  
+  .admin-sidebar.open {
+    left: 0;
+  }
+  
+  .sidebar-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+    backdrop-filter: blur(2px);
+  }
+  
+  .mobile-header {
+    display: flex !important;
+  }
+  
   .main-content {
-    padding: 0.75rem !important;
-    padding-top: 4.5rem !important;
-    padding-bottom: 7rem !important;
+    padding: 1rem !important;
+    padding-top: 5rem !important; /* Make room for mobile header */
+    padding-bottom: 7rem !important; /* Make room for POS fixed bottom bar */
   }
-  h1 { font-size: 1.15rem !important; }
-  .btn-primary, .btn-secondary { font-size: 0.88rem; padding: 0.65rem 0.9rem; }
-}
 
-.mobile-only-btn {
-  display: none;
-}
-@media (max-width: 768px) {
-  .mobile-only-btn {
-    display: flex;
+  /* Modal improvements on mobile */
+  .modal-content {
+    padding: 1.25rem !important;
+    max-width: 100% !important;
+    margin: 0.5rem !important;
+    border-radius: 12px !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  /* Glass panels smaller padding on mobile */
+  .glass-panel {
+    border-radius: 12px !important;
+  }
+
+  /* TABLE: allow horizontal scroll on mobile */
+  .data-table th, .data-table td {
+    padding: 0.65rem 0.75rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* Branch h1 font size on mobile */
+  h1 { font-size: 1.3rem !important; }
+  h2 { font-size: 1.1rem !important; }
+  
+  /* POS Header area - stack vertically */
+  .pos-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+  
+  .pos-header > div:last-child {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+  
+  .pos-header select {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  /* POS Fixed bottom bar responsive */
+  .pos-submit-bar {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    padding: 0.75rem 1rem !important;
+  }
+  
+  .pos-submit-bar > div:first-child {
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    width: 100%;
+  }
+
+  .pos-submit-bar button {
+    width: 100% !important;
+    padding: 0.9rem !important;
+    font-size: 1rem !important;
   }
 }
 
-/* Hide mobile header on desktop */
-.mobile-header {
-  display: none;
-}
-
-/* Table styling for nice contrast */
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-}
-
-.data-table th, .data-table td {
-  padding: 1rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.data-table th {
-  color: var(--text-muted);
-  font-weight: 600;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background-color: #f8fafc;
-}
-
-.data-table tr:hover td {
-  background-color: rgba(9, 108, 70, 0.02);
-}
-
-.text-center { text-align: center; }
-.text-right { text-align: right; }
-
-/* Responsive Table Wrapper */
-.table-responsive {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
 
 /* ==========================================================================
    PRINT STYLES (Thermal Receipt)
    ========================================================================== */
 @media print {
-  /* Hide EVERYTHING by default */
-  body * {
-    visibility: hidden;
-  }
-  
-  /* Show ONLY the receipt container and its children */
-  #receipt-print-area, #receipt-print-area * {
-    visibility: visible;
-  }
-  
-  #receipt-print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 58mm; /* Standard thermal printer width */
+  @page {
     margin: 0;
-    padding: 0;
-    border: none !important;
+    size: 58mm auto;
+  }
+  
+  /* 1. Paksa ukuran kertas dan hilangkan margin default printer */
+  @page {
+    margin: 0;
+    size: 58mm auto;
   }
 
-  /* Ensure background and borders print */
+  /* 2. Reset body */
+  body {
+    background-color: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  /* 3. SEMBUNYIKAN SEMUA ELEMEN LUAR YANG TIDAK PERLU */
+  .no-print, 
+  .admin-sidebar, 
+  .mobile-header, 
+  .sidebar-overlay:not(:has(#receipt-print-area)) {
+    display: none !important;
+  }
+
+  /* 4. LUCUTI SEMUA STYLE DARI PARENT (Agar tidak ada yang mendorong ke halaman 2) */
+  #root, 
+  .admin-layout-root, 
+  .main-content, 
+  .pos-root, 
+  .pos-grid,
+  .modal-overlay, 
+  .sidebar-overlay, 
+  .modal-content,
+  #cart-section {
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    transform: none !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* 6. SETTING KHUSUS AREA NOTA */
+  #receipt-print-area {
+    width: 280px !important; 
+    margin: 0 auto !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    display: block !important;
+  }
+
+  /* 7. Kembalikan style flex khusus di DALAM nota agar rapi */
+  #receipt-print-area div[style*="display: flex"] {
+    display: flex !important;
+  }
+
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;

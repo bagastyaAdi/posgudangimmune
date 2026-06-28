@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Filter, Trash2, AlertCircle, Eye, X, Receipt, Download } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useSettings } from '../contexts/SettingsContext';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInDays } from 'date-fns';
 import { id } from 'date-fns/locale';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '';
@@ -83,68 +83,285 @@ export default function AdminPOS() {
   const displayRecords = getFilteredData();
 
   const handleExportExcel = () => {
+    if (!startDate || !endDate) {
+      alert("Harap pilih Tanggal Mulai dan Tanggal Akhir terlebih dahulu sebelum mengekspor.");
+      return;
+    }
+    if (differenceInDays(parseISO(endDate), parseISO(startDate)) > 30) {
+      alert("Rentang waktu maksimal untuk laporan ini adalah 30 hari. Silakan sesuaikan tanggal Anda.");
+      return;
+    }
     if (displayRecords.length === 0) {
       alert("Tidak ada data transaksi untuk diekspor pada rentang waktu ini.");
       return;
     }
 
-    const excelData = [];
-    const sortedForExcel = [...displayRecords].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const workbook = XLSX.utils.book_new();
 
-    sortedForExcel.forEach(tx => {
-      const dateObj = new Date(tx.created_at);
-      const date = dateObj.toLocaleDateString('id-ID');
-      const time = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      const staffName = tx.staff_name || 'Unknown';
-      const branchName = tx.branch_name || 'Pusat';
-      const payment = tx.payment_method || '-';
-      const totalAmount = tx.total_amount || 0;
-      
-      const produkArray = tx.details || [];
-      
-      if (produkArray.length === 0) {
-        excelData.push({
-          "Tanggal": date,
-          "Waktu": time,
-          "Cabang": branchName,
-          "Nama Kasir": staffName,
-          "Metode": payment,
-          "Produk Terjual": "-",
-          "Qty Item": 0,
-          "Total Penjualan (Rp)": totalAmount
-        });
-      } else {
-        produkArray.forEach((p, index) => {
-          excelData.push({
-            "Tanggal": index === 0 ? date : "",
-            "Waktu": index === 0 ? time : "",
-            "Cabang": index === 0 ? branchName : "",
-            "Nama Kasir": index === 0 ? staffName : "",
-            "Metode": index === 0 ? payment : "",
-            "Produk Terjual": `${p.name}${p.variant && p.variant !== 'Standar' ? ` (${p.variant})` : ''}`,
-            "Qty Item": p.qty,
-            "Total Penjualan (Rp)": index === 0 ? totalAmount : ""
-          });
-        });
-      }
+    // Mengelompokkan transaksi per tanggal
+    const dailyTxMap = {};
+    displayRecords.forEach(tx => {
+      const dateStr = tx.created_at.split('T')[0];
+      if (!dailyTxMap[dateStr]) dailyTxMap[dateStr] = [];
+      dailyTxMap[dateStr].push(tx);
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
-    
-    worksheet['!cols'] = [
-      { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, 
-      { wch: 15 }, { wch: 60 }, { wch: 15 }, { wch: 20 }
-    ];
+    const sortedDates = Object.keys(dailyTxMap).sort();
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Penjualan");
+    // ==========================================
+    // 1. SHEET RESUME PENJUALAN
+    // ==========================================
+    const resumeData = [];
+    let globalTotalTrans = 0;
+    let globalTotalCup = 0;
+    let globalTotalPemasukan = 0;
+    let globalTotalNonTunai = 0;
+
+    // Untuk tabel grafik
+    const tableGrafik = [];
+
+    sortedDates.forEach(dateStr => {
+      const txs = dailyTxMap[dateStr];
+      let dailyTrans = 0, dailyCup = 0, dailyPemasukan = 0, dailyNonTunai = 0;
+
+      txs.forEach(tx => {
+        if (tx.payment_method === 'Modal Awal' || tx.payment_method === 'Tutup Kasir') return;
+        
+        dailyTrans++;
+        
+        const txTotal = Number(tx.total_amount) || 0;
+        dailyPemasukan += txTotal;
+        if (tx.payment_method === 'QRIS' || tx.payment_method === 'Transfer') {
+          dailyNonTunai += txTotal;
+        }
+
+        let produkArray = tx.details || [];
+        if (typeof produkArray === 'string') {
+          try { produkArray = JSON.parse(produkArray); } catch(e) {}
+        }
+        if (Array.isArray(produkArray)) {
+          produkArray.forEach(p => dailyCup += (Number(p.qty) || 0));
+        }
+      });
+
+      const formattedDate = format(parseISO(dateStr), 'dd MMM yyyy', { locale: id });
+      
+      tableGrafik.push({
+        "Tanggal": formattedDate,
+        "Total Transaksi": dailyTrans,
+        "Total Produk (Item)": dailyCup,
+        "Pendapatan Kotor": dailyPemasukan,
+        "Pembayaran QR/Transfer": dailyNonTunai,
+        "Uang Tunai Bersih": dailyPemasukan - dailyNonTunai
+      });
+
+      globalTotalTrans += dailyTrans;
+      globalTotalCup += dailyCup;
+      globalTotalPemasukan += dailyPemasukan;
+      globalTotalNonTunai += dailyNonTunai;
+    });
+
+    resumeData.push({ "Tanggal": "LAPORAN RESUME PENJUALAN", "Total Transaksi": "", "Total Produk (Item)": "", "Pendapatan Kotor": "", "Pembayaran QR/Transfer": "", "Uang Tunai Bersih": "" });
+    resumeData.push({ "Tanggal": `Rentang: ${format(parseISO(startDate), 'dd MMM yyyy', { locale: id })} - ${format(parseISO(endDate), 'dd MMM yyyy', { locale: id })}`, "Total Transaksi": "", "Total Produk (Item)": "", "Pendapatan Kotor": "", "Pembayaran QR/Transfer": "", "Uang Tunai Bersih": "" });
+    if (filterBranch) resumeData.push({ "Tanggal": `Cabang: ${filterBranch}`, "Total Transaksi": "", "Total Produk (Item)": "", "Pendapatan Kotor": "", "Pembayaran QR/Transfer": "", "Uang Tunai Bersih": "" });
+    resumeData.push({});
+    resumeData.push({ "Tanggal": "Tabel Rekapitulasi Harian (Sorot/Block data di bawah ini lalu klik 'Insert > Chart' di Excel untuk membuat Grafik Otomatis):", "Total Transaksi": "", "Total Produk (Item)": "", "Pendapatan Kotor": "", "Pembayaran QR/Transfer": "", "Uang Tunai Bersih": "" });
+    resumeData.push({});
+
+    tableGrafik.forEach(row => resumeData.push(row));
+
+    resumeData.push({});
+    resumeData.push({
+      "Tanggal": "TOTAL KESELURUHAN",
+      "Total Transaksi": globalTotalTrans,
+      "Total Produk (Item)": globalTotalCup,
+      "Pendapatan Kotor": globalTotalPemasukan,
+      "Pembayaran QR/Transfer": globalTotalNonTunai,
+      "Uang Tunai Bersih": globalTotalPemasukan - globalTotalNonTunai
+    });
+
+    const resumeWs = XLSX.utils.json_to_sheet(resumeData);
     
+    // Resume WS Styling
+    resumeWs['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 22 }, { wch: 20 }];
+    const resumeRange = XLSX.utils.decode_range(resumeWs['!ref']);
+    for (let R = resumeRange.s.r; R <= resumeRange.e.r; ++R) {
+      for (let C = resumeRange.s.c; C <= resumeRange.e.c; ++C) {
+        const addr = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!resumeWs[addr]) continue;
+        
+        let cell = resumeWs[addr];
+        let font = null;
+        let alignment = { vertical: "center" };
+        let border = null;
+
+        // Bold headers and totals
+        if (R === 0 || R === 1 || R === 6 || R === resumeRange.e.r) font = { bold: true };
+        
+        // Alignment
+        if (C > 0 && R >= 7) alignment = { horizontal: "right", vertical: "center" };
+        
+        // Number format
+        if (typeof cell.v === 'number' && C >= 3) cell.z = '#,##0';
+
+        // Border for table
+        if (R >= 6 && R <= resumeRange.e.r && cell.v !== undefined) {
+           border = {
+             top: { style: "thin", color: { rgb: "000000" } },
+             bottom: { style: "thin", color: { rgb: "000000" } },
+             left: { style: "thin", color: { rgb: "000000" } },
+             right: { style: "thin", color: { rgb: "000000" } }
+           };
+        }
+
+        const style = { alignment };
+        if (font) style.font = font;
+        if (border) style.border = border;
+        cell.s = style;
+      }
+    }
+    
+    XLSX.utils.book_append_sheet(workbook, resumeWs, "Resume Penjualan");
+
+    // ==========================================
+    // 2. SHEET HARIAN (1 Tab per Hari)
+    // ==========================================
+    sortedDates.forEach(dateStr => {
+      const dailyTransactions = dailyTxMap[dateStr];
+      const productStats = {};
+      let grandTotalCup = 0, grandTotalPemasukan = 0;
+      let totalQR = 0, totalTransfer = 0, totalTransaksi = 0, modalAwal = 0;
+
+      dailyTransactions.forEach(tx => {
+        const txTotal = Number(tx.total_amount) || 0;
+        if (tx.payment_method === 'Modal Awal') modalAwal += txTotal;
+        if (tx.payment_method === 'Modal Awal' || tx.payment_method === 'Tutup Kasir') return;
+
+        totalTransaksi++;
+        
+        if (tx.payment_method === 'QRIS') totalQR += txTotal;
+        else if (tx.payment_method === 'Transfer') totalTransfer += txTotal;
+
+        let produkArray = tx.details || [];
+        if (typeof produkArray === 'string') {
+          try { produkArray = JSON.parse(produkArray); } catch(e) { produkArray = []; }
+        }
+        if (!Array.isArray(produkArray)) produkArray = [];
+
+        produkArray.forEach(p => {
+          const name = p.name;
+          const variant = (p.variant && p.variant !== 'Standar') ? p.variant : '';
+          const displayName = variant ? `${name} - ${variant}` : name;
+          
+          const qty = Number(p.qty) || 0;
+          const price = Number(p.price) || 0;
+          const total = qty * price;
+
+          if (!productStats[displayName]) productStats[displayName] = { qty: 0, total: 0 };
+          productStats[displayName].qty += qty;
+          productStats[displayName].total += total;
+
+          grandTotalCup += qty;
+          grandTotalPemasukan += total;
+        });
+      });
+
+      const excelData = [];
+      let no = 1;
+
+      Object.keys(productStats).sort().forEach(displayName => {
+        const stats = productStats[displayName];
+        excelData.push({ "No": no++, "Nama Produk": displayName, "QTY": stats.qty > 0 ? stats.qty : "", "PRICE": stats.total > 0 ? stats.total : "" });
+      });
+
+      excelData.push({}); 
+      excelData.push({ "No": "", "Nama Produk": "TOTAL", "QTY": grandTotalCup, "PRICE": grandTotalPemasukan });
+      excelData.push({});
+      excelData.push({});
+
+      excelData.push({ "No": "Cash Awal", "Nama Produk": modalAwal, "QTY": "", "PRICE": "" });
+      excelData.push({ "No": "TOTAL Item", "Nama Produk": grandTotalCup, "QTY": "Total Transaksi", "PRICE": totalTransaksi });
+      excelData.push({ "No": "Pemasukan", "Nama Produk": grandTotalPemasukan, "QTY": "", "PRICE": "" });
+      
+      excelData.push({ "No": "Pengeluaran", "Nama Produk": "Pembayaran Transfer", "QTY": -totalTransfer, "PRICE": "" });
+      excelData.push({ "No": "", "Nama Produk": "Pembayaran QR", "QTY": -totalQR, "PRICE": `TOTAL PENGELUARAN ${(-(totalTransfer + totalQR)).toLocaleString('id-ID')}` });
+      
+      const totalPenjualanBersih = grandTotalPemasukan - (totalTransfer + totalQR);
+      excelData.push({ "No": "TOTAL PENJUALAN", "Nama Produk": totalPenjualanBersih, "QTY": "", "PRICE": "" });
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      worksheet['!cols'] = [{ wch: 18 }, { wch: 60 }, { wch: 15 }, { wch: 25 }];
+
+      const range = XLSX.utils.decode_range(worksheet['!ref']);
+      const productCount = Object.keys(productStats).length;
+      const summaryStart = productCount + 5;
+      
+      const borderAll = {
+        top: { style: "thin", color: { rgb: "000000" } },
+        bottom: { style: "thin", color: { rgb: "000000" } },
+        left: { style: "thin", color: { rgb: "000000" } },
+        right: { style: "thin", color: { rgb: "000000" } }
+      };
+
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        if (R === productCount + 1 || R === productCount + 3 || R === productCount + 4) continue;
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          if (!worksheet[cellAddress]) worksheet[cellAddress] = { t: 's', v: '' }; 
+          
+          const cell = worksheet[cellAddress];
+          let font = null;
+          let fill = null;
+          let alignment = { vertical: "center" };
+          let border = { ...borderAll };
+
+          if (R === 0) {
+            font = { bold: true };
+            fill = { fgColor: { rgb: "D9D9D9" } };
+            alignment = { horizontal: "center", vertical: "center" };
+          } else if (R > 0 && R <= productCount) {
+             if (R % 2 === 0) fill = { fgColor: { rgb: "EAEAEA" } };
+             if (C === 0) alignment = { horizontal: "right", vertical: "center" };
+             else if (C === 1) alignment = { horizontal: "left", vertical: "center" };
+             else alignment = { horizontal: "right", vertical: "center" };
+          } else if (R === productCount + 2) {
+            fill = { fgColor: { rgb: "D9D9D9" } };
+            if (C === 1) alignment = { horizontal: "left", vertical: "center" };
+            else alignment = { horizontal: "right", vertical: "center" };
+          } else if (R >= summaryStart) {
+             if (R === summaryStart + 5) font = { bold: true };
+             if (cell.v && String(cell.v).includes("TOTAL PENGELUARAN")) font = { bold: true };
+             
+             if (R === summaryStart + 3 && C === 0) alignment = { horizontal: "left", vertical: "center" };
+             else if (C === 0 || C === 1) alignment = { horizontal: "left", vertical: "center" }; 
+             else if (C === 2 || C === 3) alignment = { horizontal: "right", vertical: "center" };
+          }
+
+          const style = { alignment, border };
+          if (font) style.font = font;
+          if (fill) style.fill = fill;
+          cell.s = style;
+
+          if (typeof cell.v === 'number') {
+             if (C === 3 || (R >= summaryStart && C === 1 && R !== summaryStart + 1) || (R >= summaryStart && C === 2)) {
+                 cell.z = '#,##0';
+             }
+          }
+        }
+      }
+
+      worksheet['!merges'] = [
+        { s: { r: summaryStart + 3, c: 0 }, e: { r: summaryStart + 4, c: 0 } }
+      ];
+
+      // Tab Excel title shouldn't be too long, e.g. "12 Jun 26"
+      const tabName = format(parseISO(dateStr), 'dd MMM yy', { locale: id });
+      XLSX.utils.book_append_sheet(workbook, worksheet, tabName);
+    });
+
     let filename = 'Laporan_Penjualan';
     if (filterBranch) filename += `_${filterBranch}`;
-    if (startDate && endDate) filename += `_${startDate}_sd_${endDate}`;
-    else if (startDate) filename += `_mulai_${startDate}`;
-    else if (endDate) filename += `_sampai_${endDate}`;
-    filename += '.xlsx';
+    filename += `_${startDate}_sd_${endDate}.xlsx`;
 
     XLSX.writeFile(workbook, filename);
   };
